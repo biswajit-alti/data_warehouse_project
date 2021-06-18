@@ -18,24 +18,47 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 # CREATE TABLES
 
 staging_events_table_create = """
-copy staging_events from {}
-credentials 'aws_iam_role={}'
-gzip region 'us-west-2';
-        """.format(
-    config["S3"]["LOG_DATA"], config["IAM_ROLE"]["ARN"]
+CREATE TABLE IF NOT EXISTS staging_events(
+artist varchar,
+auth varchar,	
+firstName varchar,	
+gender varchar,	
+itemInSession int,	
+lastName varchar,	
+length float,	
+level varchar,	
+location varchar,	
+method varchar,	
+page varchar,	
+registration float,	
+sessionId int,	
+song varchar,	
+status int,	
+ts bigint,	
+userAgent varchar,	
+userId int
 )
+"""
+
 
 staging_songs_table_create = """
-copy staging_songs from {}
-credentials 'aws_iam_role={}'
-gzip region 'us-west-2';
-        """.format(
-    config["S3"]["SONG_DATA"], config["IAM_ROLE"]["ARN"]
+CREATE TABLE IF NOT EXISTS staging_songs(
+num_songs int, 
+artist_id varchar, 
+artist_latitude float,
+artist_longitude float,	
+artist_location varchar,	
+artist_name varchar,	
+song_id varchar,	
+title varchar,	
+duration float,	
+year int
 )
+"""
 
 songplay_table_create = """
 CREATE TABLE IF NOT EXISTS songplays(
-songplay_id IDENTITY(0,1) PRIMARY KEY, 
+songplay_id int IDENTITY(0,1) PRIMARY KEY, 
 start_time timestamp NOT NULL, 
 user_id int NOT NULL, 
 level varchar, 
@@ -91,25 +114,23 @@ weekday int
 
 # STAGING TABLES
 
-staging_events_copy = (
-    """
+staging_events_copy = """
 copy staging_events 
 from {} iam_role {} 
-compupdate off region 'us-west-2' json {} """
-).format(
+compupdate off region 'us-west-2' json {} """.format(
     config.get("S3", "LOG_DATA"),
     config.get("IAM_ROLE", "ARN"),
     config.get("S3", "LOG_JSONPATH"),
 )
 
 
-staging_songs_copy = (
-    """copy staging_events 
+staging_songs_copy = """copy staging_songs
 from {} iam_role {} 
-compupdate off region 'us-west-2' json {} 
-"""
-).format()
-
+compupdate off region 'us-west-2' json 'auto'
+""".format(
+    config.get("S3", "SONG_DATA"),
+    config.get("IAM_ROLE", "ARN"),
+)
 # FINAL TABLES
 
 songplay_table_insert = """

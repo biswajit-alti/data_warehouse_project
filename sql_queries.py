@@ -60,7 +60,7 @@ songplay_table_create = """
 CREATE TABLE IF NOT EXISTS songplays(
 songplay_id int IDENTITY(0,1) PRIMARY KEY, 
 start_time timestamp NOT NULL, 
-user_id int, 
+user_id int NOT NULL, 
 level text, 
 song_id text,
 artist_id text, 
@@ -72,7 +72,7 @@ user_agent text
 
 user_table_create = """
 CREATE TABLE IF NOT EXISTS users(
-user_id int, 
+user_id int PRIMARY KEY, 
 first_name text, 
 last_name text, 
 gender text, 
@@ -144,7 +144,7 @@ songplay_table_insert = """
         location,
         user_agent
     ) 
-    SELECT
+    SELECT DISTINCT
         (TIMESTAMP 'epoch' + se.ts/1000*INTERVAL '1 second') AS start_time, 
         se.userId,
         se.level,
@@ -155,24 +155,26 @@ songplay_table_insert = """
         se.userAgent
     FROM staging_events se
         LEFT JOIN staging_songs ss
-            ON se.song = ss.title;
+            ON se.song = ss.title
+    WHERE se.page = 'NextSong';
 """
 
 user_table_insert = """
     INSERT INTO users(user_id, first_name, last_name, gender, level) 
-    SELECT
+    SELECT DISTINCT
         se.userId,
         se.firstName,
         se.lastName,
         se.gender,
         se.level
     FROM 
-        staging_events se;
+        staging_events se
+    WHERE se.page = 'NextSong';
 """
 
 song_table_insert = """
     INSERT INTO songs(song_id, title, artist_id, year, duration) 
-    SELECT
+    SELECT DISTINCT
         ss.song_id,
         ss.title,
         ss.artist_id,
@@ -184,7 +186,7 @@ song_table_insert = """
 
 artist_table_insert = """
     INSERT INTO artists(artist_id, name, location, latitude, longitude) 
-    SELECT
+    SELECT DISTINCT
         ss.artist_id,
         ss.title,
         ss.artist_location,
@@ -197,7 +199,7 @@ artist_table_insert = """
 
 time_table_insert = """
     INSERT INTO time(start_time, hour, day, week, month, year, weekday) 
-    SELECT
+    SELECT DISTINCT
         a.start,
         EXTRACT(HOUR FROM a.start),
         EXTRACT(DAY FROM a.start),
@@ -206,7 +208,8 @@ time_table_insert = """
         EXTRACT(YEAR FROM a.start),
         EXTRACT(WEEKDAY FROM a.start)
     FROM
-    (SELECT (TIMESTAMP 'epoch' + se.ts/1000*INTERVAL '1 second') AS start FROM staging_events se) a;
+    (SELECT (TIMESTAMP 'epoch' + se.ts/1000*INTERVAL '1 second') AS start FROM staging_events se
+    WHERE se.page = 'NextSong') a;
 """
 
 # QUERY LISTS

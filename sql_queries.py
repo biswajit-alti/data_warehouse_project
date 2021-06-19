@@ -19,23 +19,23 @@ time_table_drop = "DROP TABLE IF EXISTS time"
 
 staging_events_table_create = """
 CREATE TABLE IF NOT EXISTS staging_events(
-artist varchar,
-auth varchar,	
-firstName varchar,	
-gender varchar,	
+artist text,
+auth text,	
+firstName text,	
+gender text,	
 itemInSession int,	
-lastName varchar,	
-length float,	
-level varchar,	
-location varchar,	
-method varchar,	
-page varchar,	
-registration float,	
+lastName text,	
+length numeric,	
+level text,	
+location text,	
+method text,	
+page text,	
+registration numeric,	
 sessionId int,	
-song varchar,	
+song text,	
 status int,	
 ts bigint,	
-userAgent varchar,	
+userAgent text,	
 userId int
 )
 """
@@ -44,14 +44,14 @@ userId int
 staging_songs_table_create = """
 CREATE TABLE IF NOT EXISTS staging_songs(
 num_songs int, 
-artist_id varchar, 
-artist_latitude float,
-artist_longitude float,	
-artist_location varchar,	
-artist_name varchar,	
-song_id varchar,	
-title varchar,	
-duration float,	
+artist_id text, 
+artist_latitude numeric,
+artist_longitude numeric,	
+artist_location text,	
+artist_name text,	
+song_id text,	
+title text,	
+duration numeric,	
 year int
 )
 """
@@ -60,49 +60,49 @@ songplay_table_create = """
 CREATE TABLE IF NOT EXISTS songplays(
 songplay_id int IDENTITY(0,1) PRIMARY KEY, 
 start_time timestamp NOT NULL, 
-user_id int NOT NULL, 
-level varchar, 
-song_id varchar NOT NULL,
-artist_id varchar NOT NULL, 
+user_id int, 
+level text, 
+song_id text,
+artist_id text, 
 session_id int, 
-location varchar,
-user_agent varchar
+location text,
+user_agent text
 )
 """
 
 user_table_create = """
 CREATE TABLE IF NOT EXISTS users(
-user_id int PRIMARY KEY, 
-first_name varchar, 
-last_name varchar, 
-gender varchar, 
-level varchar
+user_id int, 
+first_name text, 
+last_name text, 
+gender text, 
+level text
 )
 """
 
 song_table_create = """
 CREATE TABLE IF NOT EXISTS songs(
-song_id varchar PRIMARY KEY, 
-title varchar, 
-artist_id varchar, 
+song_id text PRIMARY KEY, 
+title text, 
+artist_id text, 
 year int, 
-duration float
+duration numeric
 )
 """
 
 artist_table_create = """
 CREATE TABLE IF NOT EXISTS artists(
-artist_id varchar PRIMARY KEY, 
-name varchar, 
-location varchar, 
-latitude float, 
-longitude float
+artist_id text PRIMARY KEY, 
+name text, 
+location text, 
+latitude numeric, 
+longitude numeric
 )
 """
 
 time_table_create = """
 CREATE TABLE IF NOT EXISTS time(
-art_time timestamp PRIMARY KEY, 
+start_time timestamp PRIMARY KEY, 
 hour int, 
 day int, 
 week int, 
@@ -134,30 +134,80 @@ compupdate off region 'us-west-2' json 'auto'
 # FINAL TABLES
 
 songplay_table_insert = """
-INSERT INTO songplays(start_time, user_id, level, song_id,artist_id, session_id, location, user_agent) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-ON CONFLICT(songplay_id) DO NOTHING"""
+    INSERT INTO songplays (
+        start_time,
+        user_id,
+        level,
+        song_id,
+        artist_id,
+        session_id,
+        location,
+        user_agent
+    ) 
+    SELECT
+        (TIMESTAMP 'epoch' + se.ts/1000*INTERVAL '1 second') AS start_time, 
+        se.userId,
+        se.level,
+        ss.song_id,
+        ss.artist_id,
+        se.sessionId,
+        se.location,
+        se.userAgent
+    FROM staging_events se
+        LEFT JOIN staging_songs ss
+            ON se.song = ss.title;
+"""
 
 user_table_insert = """
-INSERT INTO users(user_id, first_name, last_name, gender, level) 
-VALUES(%s,%s,%s,%s,%s)
-ON CONFLICT(user_id) DO UPDATE 
-SET level = EXCLUDED.level"""
+    INSERT INTO users(user_id, first_name, last_name, gender, level) 
+    SELECT
+        se.userId,
+        se.firstName,
+        se.lastName,
+        se.gender,
+        se.level
+    FROM 
+        staging_events se;
+"""
 
 song_table_insert = """
-INSERT INTO songs(song_id, title, artist_id, year, duration) 
-VALUES(%s,%s,%s,%s,%s)
-ON CONFLICT(song_id) DO NOTHING"""
+    INSERT INTO songs(song_id, title, artist_id, year, duration) 
+    SELECT
+        ss.song_id,
+        ss.title,
+        ss.artist_id,
+        ss.year,
+        ss.duration
+    FROM 
+        staging_songs ss;
+"""
 
 artist_table_insert = """
-INSERT INTO artists(artist_id, name, location, latitude, longitude) 
-VALUES(%s,%s,%s,%s,%s)
-ON CONFLICT(artist_id) DO NOTHING"""
+    INSERT INTO artists(artist_id, name, location, latitude, longitude) 
+    SELECT
+        ss.artist_id,
+        ss.title,
+        ss.artist_location,
+        ss.artist_latitude,
+        ss.artist_longitude
+    FROM 
+        staging_songs ss;
+"""
 
 
 time_table_insert = """
-INSERT INTO time(art_time, hour, day, week, month, year, weekday) 
-VALUES(%s,%s,%s,%s,%s,%s,%s)
-ON CONFLICT(art_time) DO NOTHING"""
+    INSERT INTO time(start_time, hour, day, week, month, year, weekday) 
+    SELECT
+        a.start,
+        EXTRACT(HOUR FROM a.start),
+        EXTRACT(DAY FROM a.start),
+        EXTRACT(WEEK FROM a.start),
+        EXTRACT(MONTH FROM a.start),
+        EXTRACT(YEAR FROM a.start),
+        EXTRACT(WEEKDAY FROM a.start)
+    FROM
+    (SELECT (TIMESTAMP 'epoch' + se.ts/1000*INTERVAL '1 second') AS start FROM staging_events se) a;
+"""
 
 # QUERY LISTS
 
